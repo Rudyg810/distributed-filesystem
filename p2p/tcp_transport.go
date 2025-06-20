@@ -1,74 +1,81 @@
 package p2p
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"sync"
 )
 
-//This represent the remote nodes over a TCP Connection
 type TCPPeer struct {
-	// conn is underlying connection of peer
 	conn net.Conn
-	//if we dial & retrieve a connection => outbound == true 
+	//outbound -> You connect to them
+	//inbound -> They connect to you
+	// if we dial and retrieve the connection => outbound true
+	// if we accept and retrieve the connection => inbound true
 	outbound bool
 }
 
 type TCPTransport struct {
 	listenAddress string
-	listener      net.Listener
+	Listener      net.Listener
 	shakeHands HandshakeFunc
 	decoder Decoder
-	peerLock      sync.RWMutex
-	peers         map[net.Addr]Peer
+
+	peerLock sync.RWMutex
+	peer map[net.Addr]Peer
 }
 
-func NewTCPTransport(listenAddr string) *TCPTransport {
-	return &TCPTransport{
-		shakeHands: NOPHandshakeFunc,
-		listenAddress: listenAddr,
-	}
-}
-
-func (t *TCPTransport) ListenAndAccept() error {
-	var err error
-	t.listener, err = net.Listen("tcp", t.listenAddress)
-	if err != nil {
-		return err
-	}
-	go t.startAcceptLoop()
-	return nil
-}
-
-func (t *TCPTransport) startAcceptLoop() {
-	for {
-		conn, err := t.listener.Accept()
-		if err != nil {
-			fmt.Print("✖ TCP accept error → ", err, "\n")
-			continue
-		}
-		go t.handleConn(conn)
-	}
-}
-
-func (t *TCPTransport) handleConn(conn net.Conn) {
-	peer := NewTCPPeer(conn,true)
-
-	if err:= t.shakeHands(conn); err != nil {
-		
-	}	
-	buf  := new(bytes.Buffer)
-	for {
-		n, _ := conn.Read(buf)
-	}
-	fmt.Print("🔗 New incoming connection → ", conn.RemoteAddr(), "\n")
-}
-
-func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
+func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer  {
 	return &TCPPeer{
 		conn,
 		outbound,
 	}
 }
 
+func NewTCPTransport(address string) *TCPTransport {
+	return &TCPTransport{
+		shakeHands: NOPHandshakeFunc,
+		listenAddress: address,
+	}
+}
+
+func (t *TCPTransport) ListenAndAccept() error {
+	ln, err := net.Listen("tcp",t.listenAddress)
+	if err != nil {
+		return err
+	}
+	t.Listener = ln
+
+	go t.startAcceptLoop()
+	return nil
+}
+
+func (t *TCPTransport) startAcceptLoop() {
+	for {
+		conn, err := t.Listener.Accept()
+		if err != nil {	
+			fmt.Print("Error", err)
+		}
+
+		go t.handleConn(conn)
+	}
+}
+
+type Temp struct{}
+
+func (t *TCPTransport) handleConn(conn net.Conn){
+	defer conn.Close()
+	// peer := NewTCPPeer(conn,false)
+	if err := t.shakeHands(conn); err != nil {
+		fmt.Print(err)
+	}
+
+	//read Loop
+	msg := &Temp{}
+	for {
+		if err := t.decoder.Decode(conn, msg); err != nil {
+			fmt.Print("TCP Error",err)
+			continue
+		}
+	}
+}
