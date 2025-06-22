@@ -1,4 +1,4 @@
-package p2p 
+package p2p
 
 //Handshake Func
 type HandshakeFunc func (any) error
